@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard • AppName</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --surface: #ffffff;
+            --text: #0f172a;
+            --text2: #64748b;
+            --border: #e2e8f0;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --accent-light: #eef2ff;
+            --danger: #ef4444;
+            --danger-light: #fef2f2;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+            --radius: 12px;
+            --radius-sm: 8px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            color: var(--text);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Layout */
+        .layout { display: flex; min-height: 100vh; }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0; left: 0; bottom: 0;
+            z-index: 100;
+            transition: transform 0.3s;
+        }
+        .sidebar-logo {
+            display: flex; align-items: center; gap: 0.65rem;
+            margin-bottom: 2rem; font-weight: 700; font-size: 1.15rem;
+            letter-spacing: -0.02em;
+        }
+        .sidebar-logo .icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            border-radius: 10px; display: flex; align-items: center;
+            justify-content: center; color: white; font-size: 1rem;
+        }
+        .nav-section { margin-bottom: 0.5rem; }
+        .nav-section .label {
+            font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 0.5rem;
+            padding: 0 0.5rem;
+        }
+        .nav-item {
+            display: flex; align-items: center; gap: 0.65rem;
+            padding: 0.6rem 0.75rem; border-radius: var(--radius-sm);
+            cursor: pointer; font-size: 0.88rem; font-weight: 500;
+            color: var(--text2); transition: all 0.15s;
+            margin-bottom: 0.15rem; text-decoration: none;
+        }
+        .nav-item:hover { background: var(--accent-light); color: var(--accent); }
+        .nav-item.active { background: var(--accent-light); color: var(--accent); font-weight: 600; }
+        .nav-item .badge {
+            margin-left: auto; background: var(--accent); color: white;
+            font-size: 0.7rem; padding: 0.15rem 0.5rem; border-radius: 20px;
+        }
+        .sidebar-footer { margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border); }
+        .user-card {
+            display: flex; align-items: center; gap: 0.65rem;
+            padding: 0.5rem; border-radius: var(--radius-sm);
+        }
+        .user-avatar {
+            width: 38px; height: 38px; border-radius: 50%;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            display: flex; align-items: center; justify-content: center;
+            color: white; font-weight: 700; font-size: 0.95rem; flex-shrink: 0;
+        }
+        .user-details { flex: 1; min-width: 0; }
+        .user-details .name { font-weight: 600; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .user-details .email { font-size: 0.75rem; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .logout-btn {
+            padding: 0.4rem 0.75rem; border: none; background: var(--danger-light);
+            color: var(--danger); border-radius: var(--radius-sm); cursor: pointer;
+            font-size: 0.78rem; font-weight: 600; transition: all 0.15s; white-space: nowrap;
+        }
+        .logout-btn:hover { background: var(--danger); color: white; }
+
+        /* Main */
+        .main { flex: 1; margin-left: 260px; padding: 1.5rem 2rem; }
+        .topbar {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 1.75rem; flex-wrap: wrap; gap: 1rem;
+        }
+        .topbar h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+        .topbar .date { font-size: 0.85rem; color: var(--text2); }
+
+        /* Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px,1fr));
+            gap: 1rem; margin-bottom: 1.75rem;
+        }
+        .stat-card {
+            background: var(--surface); border-radius: var(--radius);
+            padding: 1.25rem; box-shadow: var(--shadow-sm);
+            transition: all 0.2s; border: 1px solid var(--border);
+        }
+        .stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+        .stat-card .stat-icon {
+            width: 40px; height: 40px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; margin-bottom: 0.75rem;
+        }
+        .stat-card .stat-icon.blue { background: #eef2ff; color: #6366f1; }
+        .stat-card .stat-icon.green { background: #ecfdf5; color: #10b981; }
+        .stat-card .stat-icon.amber { background: #fffbeb; color: #f59e0b; }
+        .stat-card .stat-icon.purple { background: #f5f3ff; color: #8b5cf6; }
+        .stat-card .stat-value { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+        .stat-card .stat-label { font-size: 0.8rem; color: var(--text2); margin-top: 0.2rem; }
+
+        /* Notepad */
+        .notepad-container {
+            background: var(--surface); border-radius: var(--radius);
+            box-shadow: var(--shadow); border: 1px solid var(--border); overflow: hidden;
+        }
+        .notepad-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);
+            flex-wrap: wrap; gap: 0.75rem;
+        }
+        .notepad-header h2 {
+            font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .notepad-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .btn {
+            padding: 0.5rem 1rem; border: none; border-radius: var(--radius-sm);
+            font-size: 0.82rem; font-weight: 600; cursor: pointer;
+            transition: all 0.15s; font-family: inherit;
+            display: inline-flex; align-items: center; gap: 0.4rem;
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-outline { background: white; color: var(--text); border: 1px solid var(--border); }
+        .btn-outline:hover { background: #f8fafc; }
+        .btn-danger { background: var(--danger-light); color: var(--danger); }
+        .btn-danger:hover { background: var(--danger); color: white; }
+        .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.78rem; }
+
+        /* Note Editor */
+        .note-editor { padding: 1.25rem; }
+        .note-editor input.title-input {
+            width: 100%; padding: 0.7rem 0; border: none;
+            font-size: 1.3rem; font-weight: 700; letter-spacing: -0.02em;
+            color: var(--text); outline: none; font-family: inherit; margin-bottom: 0.5rem;
+        }
+        .note-editor input.title-input::placeholder { color: #cbd5e1; }
+        .note-editor textarea {
+            width: 100%; min-height: 250px; padding: 0.7rem 0;
+            border: none; resize: vertical; font-size: 0.95rem;
+            line-height: 1.7; color: var(--text); outline: none; font-family: inherit;
+        }
+        .note-editor textarea::placeholder { color: #cbd5e1; }
+
+        /* Notes List */
+        .notes-list { padding: 0 1.25rem 1.25rem; }
+        .notes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px,1fr));
+            gap: 0.75rem;
+        }
+        .note-card {
+            background: #f8fafc; border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 1rem;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .note-card:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+        .note-card .note-title {
+            font-weight: 600; font-size: 0.9rem; margin-bottom: 0.35rem;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .note-card .note-preview {
+            font-size: 0.8rem; color: var(--text2);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 0.5rem;
+        }
+        .note-card .note-meta {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 0.7rem; color: #94a3b8;
+        }
+        .note-card .note-delete {
+            background: none; border: none; color: #94a3b8; cursor: pointer;
+            font-size: 1rem; padding: 0.15rem; border-radius: 4px; transition: all 0.15s;
+        }
+        .note-card .note-delete:hover { color: var(--danger); background: var(--danger-light); }
+
+        /* Empty State */
+        .empty-state { text-align: center; padding: 3rem 1rem; color: var(--text2); }
+        .empty-state .empty-icon { font-size: 3rem; margin-bottom: 0.75rem; }
+        .empty-state p { font-size: 0.9rem; }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed; inset: 0; background: rgba(255,255,255,0.8);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 999; font-size: 1.1rem; color: var(--text2);
+        }
+        .spinner {
+            width: 28px; height: 28px; border: 3px solid #e2e8f0;
+            border-top-color: var(--accent); border-radius: 50%;
+            animation: spin 0.7s linear infinite; margin-right: 0.75rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999;
+            background: #1e293b; color: white; padding: 0.75rem 1.25rem;
+            border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 500;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            animation: slideUp 0.3s ease-out; display: none;
+        }
+        .toast.show { display: block; }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Mobile */
+        .menu-toggle {
+            display: none; position: fixed; top: 1rem; left: 1rem; z-index: 200;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); padding: 0.5rem 0.65rem;
+            cursor: pointer; font-size: 1.2rem;
+        }
+        .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99; }
+
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .main { margin-left: 0; padding: 1rem; }
+            .menu-toggle { display: block; }
+            .overlay.show { display: block; }
+            .stats { grid-template-columns: 1fr 1fr; }
+            .notes-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Mobile Menu -->
+    <button class="menu-toggle" id="menuToggle">☰</button>
+    <div class="overlay" id="overlay"></div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- Loading -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div> Loading...
+    </div>
+
+    <div class="layout">
+        <!-- ═══ SIDEBAR ═══ -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-logo">
+                <div class="icon">◆</div>
+                AppName
+            </div>
+            <nav>
+                <div class="nav-section">
+                    <div class="label">Main</div>
+                    <a class="nav-item active">
+                        <span>📋</span> Notes
+                        <span class="badge" id="noteCount">0</span>
+                    </a>
+                    <a class="nav-item"><span>📊</span> Analytics</a>
+                    <a class="nav-item"><span>⚙️</span> Settings</a>
+                </div>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-card">
+                    <div class="user-avatar" id="userAvatar">U</div>
+                    <div class="user-details">
+                        <div class="name" id="userName">User</div>
+                        <div class="email" id="userEmail">user@email.com</div>
+                    </div>
+                    <button class="logout-btn" id="logoutBtn">Logout</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ═══ MAIN ═══ -->
+        <main class="main">
+            <div class="topbar">
+                <div>
+                    <h1>My Notes</h1>
+                    <p class="date" id="currentDate"></p>
+                </div>
+                <button class="btn btn-primary" id="newNoteBtn">✏️ New Note</button>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="stat-icon blue">📝</div>
+                    <div class="stat-value" id="totalNotes">0</div>
+                    <div class="stat-label">Total Notes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green">✅</div>
+                    <div class="stat-value" id="todayNotes">0</div>
+                    <div class="stat-label">Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon amber">📌</div>
+                    <div class="stat-value" id="pinnedNotes">0</div>
+                    <div class="stat-label">Pinned</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon purple">📄</div>
+                    <div class="stat-value" id="totalWords">0</div>
+                    <div class="stat-label">Words</div>
+                </div>
+            </div>
+
+            <!-- Notepad -->
+            <div class="notepad-container">
+                <!-- Editor -->
+                <div id="noteEditor" style="display:none;">
+                    <div class="notepad-header">
+                        <h2>✏️ <span id="editorMode">New Note</span></h2>
+                        <div class="notepad-actions">
+                            <button class="btn btn-outline btn-sm" id="pinNoteBtn">📌 Pin</button>
+                            <button class="btn btn-primary btn-sm" id="saveNoteBtn">💾 Save</button>
+                            <button class="btn btn-outline btn-sm" id="cancelNoteBtn">✕ Cancel</button>
+                        </div>
+                    </div>
+                    <div class="note-editor">
+                        <input type="text" class="title-input" id="noteTitle" placeholder="Note title...">
+                        <textarea id="noteContent" placeholder="Start writing your notes here..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Notes List -->
+                <div id="notesListView">
+                    <div class="notepad-header">
+                        <h2>📋 All Notes</h2>
+                        <div class="notepad-actions">
+                            <button class="btn btn-outline btn-sm" id="sortRecentBtn">🕐 Recent</button>
+                            <button class="btn btn-danger btn-sm" id="deleteAllBtn">🗑️ Clear All</button>
+                        </div>
+                    </div>
+                    <div class="notes-list">
+                        <div class="notes-grid" id="notesGrid"></div>
+                        <div class="empty-state" id="emptyState">
+                            <div class="empty-icon">📝</div>
+                            <p>No notes yet. Click "New Note" to start writing!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ═══════════════════════════════════════
+        // CONFIGURATION
+        // ═══════════════════════════════════════
+        const SUPABASE_URL = 'https://zpdtzhuygfljrzmdujdv.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwZHR6aHV5Z2ZsanJ6bWR1amR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4NzIyNzgsImV4cCI6MjA5NzQ0ODI3OH0.RIKRjajscerC3yoyYE7b-5JZV1hChJ9Hh-EmC-BMRYw';
+        const LOGIN_URL = '/index.html';
+
+        // ═══════════════════════════════════════
+        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+        let notes = [];
+        let editingNoteId = null;
+        let isPinned = false;
+
+        // ── Helpers ──
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2500);
+        }
+
+        function showLoading() { document.getElementById('loadingOverlay').style.display = 'flex'; }
+
+        function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text || '';
+            return div.innerHTML;
+        }
+
+        // ── Load Notes from Supabase ──
+        async function loadNotes() {
+            showLoading();
+            const { data, error } = await sb
+                .from('notes')
+                .select('*')
+                .order('updated_at', { ascending: false });
+
+            if (error) {
+                console.error('Load error:', error);
+                notes = [];
+                showToast('❌ Failed to load notes');
+            } else {
+                notes = data.map(n => ({
+                    id: n.id,
+                    title: n.title,
+                    content: n.content,
+                    pinned: n.pinned,
+                    date: new Date(n.created_at).toLocaleDateString(),
+                    timestamp: new Date(n.updated_at).getTime(),
+                }));
+            }
+            hideLoading();
+        }
+
+        // ── Save Note to Supabase ──
+        async function saveNoteToDb(noteData) {
+            if (editingNoteId !== null) {
+                const noteId = notes[editingNoteId].id;
+                const { error } = await sb
+                    .from('notes')
+                    .update({
+                        title: noteData.title,
+                        content: noteData.content,
+                        pinned: noteData.pinned,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', noteId);
+
+                if (error) { showToast('❌ Update failed: ' + error.message); return false; }
+                showToast('✅ Note updated!');
+            } else {
+                const { error } = await sb
+                    .from('notes')
+                    .insert({
+                        user_id: currentUser.id,
+                        title: noteData.title,
+                        content: noteData.content,
+                        pinned: noteData.pinned,
+                    });
+
+                if (error) { showToast('❌ Create failed: ' + error.message); return false; }
+                showToast('✅ Note created!');
+            }
+            return true;
+        }
+
+        // ── Delete Note ──
+        async function deleteNoteFromDb(index) {
+            const noteId = notes[index].id;
+            const { error } = await sb
+                .from('notes')
+                .delete()
+                .eq('id', noteId);
+
+            if (error) { showToast('❌ Delete failed'); return false; }
+            return true;
+        }
+
+        // ── Render Notes ──
+        function renderNotes() {
+            const grid = document.getElementById('notesGrid');
+            const empty = document.getElementById('emptyState');
+            const count = document.getElementById('noteCount');
+            const totalNotes = document.getElementById('totalNotes');
+
+            grid.innerHTML = '';
+            count.textContent = notes.length;
+            totalNotes.textContent = notes.length;
+
+            if (notes.length === 0) {
+                empty.style.display = 'block';
+                grid.style.display = 'none';
+            } else {
+                empty.style.display = 'none';
+                grid.style.display = 'grid';
+
+                notes.forEach((note, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'note-card';
+                    card.innerHTML = `
+                        <div class="note-title">${note.pinned ? '📌 ' : ''}${escapeHtml(note.title || 'Untitled')}</div>
+                        <div class="note-preview">${escapeHtml(note.content || 'No content...')}</div>
+                        <div class="note-meta">
+                            <span>${note.date}</span>
+                            <button class="note-delete" data-index="${index}" title="Delete">🗑️</button>
+                        </div>
+                    `;
+                    card.addEventListener('click', (e) => {
+                        if (!e.target.classList.contains('note-delete')) editNote(index);
+                    });
+                    grid.appendChild(card);
+                });
+
+                document.querySelectorAll('.note-delete').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deleteNote(parseInt(btn.dataset.index));
+                    });
+                });
+            }
+
+            updateStats();
+        }
+
+        function updateStats() {
+            const today = new Date().toLocaleDateString();
+            const todayCount = notes.filter(n => n.date === today).length;
+            const pinnedCount = notes.filter(n => n.pinned).length;
+            const wordCount = notes.reduce((sum, n) => {
+                return sum + (n.content?.split(/\s+/).filter(w => w.length > 0).length || 0);
+            }, 0);
+
+            document.getElementById('todayNotes').textContent = todayCount;
+            document.getElementById('pinnedNotes').textContent = pinnedCount;
+            document.getElementById('totalWords').textContent = wordCount;
+        }
+
+        // ── New Note ──
+        function newNote() {
+            editingNoteId = null;
+            isPinned = false;
+            document.getElementById('noteTitle').value = '';
+            document.getElementById('noteContent').value = '';
+            document.getElementById('editorMode').textContent = 'New Note';
+            document.getElementById('pinNoteBtn').textContent = '📌 Pin';
+            document.getElementById('noteEditor').style.display = 'block';
+            document.getElementById('notesListView').style.display = 'none';
+            document.getElementById('noteTitle').focus();
+        }
+
+        // ── Edit Note ──
+        function editNote(index) {
+            const note = notes[index];
+            editingNoteId = index;
+            isPinned = note.pinned;
+            document.getElementById('noteTitle').value = note.title;
+            document.getElementById('noteContent').value = note.content;
+            document.getElementById('editorMode').textContent = 'Edit Note';
+            document.getElementById('pinNoteBtn').textContent = note.pinned ? '📌 Pinned' : '📌 Pin';
+            document.getElementById('noteEditor').style.display = 'block';
+            document.getElementById('notesListView').style.display = 'none';
+            document.getElementById('noteContent').focus();
+        }
+
+        // ── Save Note ──
+        async function saveNote() {
+            const title = document.getElementById('noteTitle').value.trim();
+            const content = document.getElementById('noteContent').value.trim();
+
+            if (!title && !content) {
+                showToast('⚠️ Please write something!');
+                return;
+            }
+
+            const noteData = {
+                title: title || 'Untitled',
+                content: content,
+                pinned: isPinned,
+            };
+
+            const btn = document.getElementById('saveNoteBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            const success = await saveNoteToDb(noteData);
+
+            btn.disabled = false;
+            btn.textContent = '💾 Save';
+
+            if (success) {
+                cancelEdit();
+                await loadNotes();
+                renderNotes();
+            }
+        }
+
+        // ── Cancel ──
+        function cancelEdit() {
+            editingNoteId = null;
+            isPinned = false;
+            document.getElementById('noteEditor').style.display = 'none';
+            document.getElementById('notesListView').style.display = 'block';
+        }
+
+        // ── Delete ──
+        async function deleteNote(index) {
+            if (!confirm('Delete this note?')) return;
+
+            showLoading();
+            const success = await deleteNoteFromDb(index);
+            if (success) {
+                await loadNotes();
+                renderNotes();
+                showToast('🗑️ Note deleted');
+            }
+            hideLoading();
+        }
+
+        // ── Delete All ──
+        async function deleteAllNotes() {
+            if (notes.length === 0) return;
+            if (!confirm('Delete ALL notes? This cannot be undone!')) return;
+
+            showLoading();
+            const { error } = await sb
+                .from('notes')
+                .delete()
+                .eq('user_id', currentUser.id);
+
+            if (error) {
+                showToast('❌ Failed to clear');
+            } else {
+                notes = [];
+                renderNotes();
+                showToast('🗑️ All notes cleared');
+            }
+            hideLoading();
+        }
+
+        // ── Toggle Pin ──
+        function togglePin() {
+            isPinned = !isPinned;
+            document.getElementById('pinNoteBtn').textContent = isPinned ? '📌 Pinned' : '📌 Pin';
+        }
+
+        // ── Sort ──
+        async function sortRecent() {
+            await loadNotes();
+            renderNotes();
+            showToast('🕐 Sorted by recent');
+        }
+
+        // ── Auth Init ──
+        async function init() {
+            showLoading();
+            const { data: { session }, error } = await sb.auth.getSession();
+
+            if (error || !session) {
+                window.location.href = LOGIN_URL;
+                return;
+            }
+
+            currentUser = session.user;
+            const name = currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'User';
+            const initial = name.charAt(0).toUpperCase();
+
+            document.getElementById('userAvatar').textContent = initial;
+            document.getElementById('userName').textContent = name;
+            document.getElementById('userEmail').textContent = currentUser.email;
+            document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            await loadNotes();
+            renderNotes();
+            hideLoading();
+        }
+
+        // ── Events ──
+        document.getElementById('newNoteBtn').addEventListener('click', newNote);
+        document.getElementById('saveNoteBtn').addEventListener('click', saveNote);
+        document.getElementById('cancelNoteBtn').addEventListener('click', cancelEdit);
+        document.getElementById('pinNoteBtn').addEventListener('click', togglePin);
+        document.getElementById('sortRecentBtn').addEventListener('click', sortRecent);
+        document.getElementById('deleteAllBtn').addEventListener('click', deleteAllNotes);
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await sb.auth.signOut();
+            window.location.href = LOGIN_URL;
+        });
+
+        // Mobile
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('overlay');
+        document.getElementById('menuToggle').addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('show');
+        });
+        overlay.addEventListener('click', () => {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('show');
+        });
+
+        // Shortcuts
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                e.preventDefault();
+                if (document.getElementById('noteEditor').style.display !== 'none') saveNote();
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+                e.preventDefault();
+                newNote();
+            }
+        });
+
+        // Auth listener
+        sb.auth.onAuthStateChange((event) => {
+            if (event === 'SIGNED_OUT') window.location.href = LOGIN_URL;
+        });
+
+        init();
+    </script>
+</body>
+</html>
